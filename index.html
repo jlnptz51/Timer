@@ -12,12 +12,20 @@
     color: #fff;
     font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2.5rem;
     padding: 1.5rem;
     text-align: center;
+  }
+
+  /* ---------- Inhalt (liegt über der Deko) ---------- */
+  main {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
   }
   h1 {
     font-size: clamp(1rem, 3vw, 1.6rem);
@@ -33,6 +41,7 @@
     gap: clamp(1rem, 3vw, 2.5rem);
   }
   .unit { min-width: 5.5rem; }
+  .unit[hidden] { display: none; }
   .num {
     display: block;
     font-size: clamp(3rem, 11vw, 7rem);
@@ -53,21 +62,87 @@
     color: #888;
   }
   .total { font-size: clamp(.85rem, 2.2vw, 1.1rem); color: #666; }
+
+  /* ---------- Schwebende Deko im Hintergrund ---------- */
+  #deko {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .item {
+    position: absolute;
+    left: var(--x);
+    top: var(--y);
+    font-size: clamp(1.6rem, 4.5vw, 3rem);
+    line-height: 1;
+    opacity: .9;
+    will-change: transform;
+    animation: sway var(--t1) ease-in-out infinite alternate;
+    animation-delay: var(--d1);
+  }
+  .item .inner {
+    display: block;
+    animation: bob var(--t2) ease-in-out infinite alternate;
+    animation-delay: var(--d2);
+  }
+  .item.ring { width: clamp(3rem, 9vw, 5.5rem); }
+  #deko.faint .item { opacity: .3; }
+  .item.ring .inner { filter: drop-shadow(0 0 6px rgba(255, 200, 80, .45)); }
+  .item.ring svg { display: block; width: 100%; height: auto; }
+
+  /* vor und zurück */
+  @keyframes sway {
+    from { transform: translateX(calc(var(--dx) * -1)); }
+    to   { transform: translateX(var(--dx)); }
+  }
+  /* leichtes Auf und Ab mit Drehung */
+  @keyframes bob {
+    from { transform: translateY(-1.8vh) rotate(-12deg); }
+    to   { transform: translateY(1.8vh)  rotate(12deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .item, .item .inner { animation: none; }
+  }
 </style>
 </head>
 <body>
-  <h1>Zeit seit dem 25.07.2026</h1>
-  <div class="timer">
-    <div class="unit"><span class="num" id="y">0</span><span class="label">Jahre</span></div>
-    <div class="unit"><span class="num" id="mo">0</span><span class="label">Monate</span></div>
-    <div class="unit"><span class="num" id="d">0</span><span class="label">Tage</span></div>
-    <div class="unit"><span class="num" id="h">00</span><span class="label">Stunden</span></div>
-    <div class="unit"><span class="num" id="mi">00</span><span class="label">Minuten</span></div>
-    <div class="unit"><span class="num" id="s">00</span><span class="label">Sekunden</span></div>
-  </div>
-  <p class="total" id="total"></p>
+
+  <!-- Vorlage für die Eheringe -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="gold" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="64" y2="40">
+        <stop offset="0" stop-color="#fff0b3"/>
+        <stop offset=".5" stop-color="#e3aa2f"/>
+        <stop offset="1" stop-color="#a16f14"/>
+      </linearGradient>
+      <symbol id="rings" viewBox="0 0 64 40">
+        <circle cx="22" cy="20" r="14" fill="none" stroke="url(#gold)" stroke-width="5"/>
+        <circle cx="42" cy="20" r="14" fill="none" stroke="url(#gold)" stroke-width="5"/>
+        <path d="M29 7.88A14 14 0 0 1 34.12 13" fill="none" stroke="url(#gold)" stroke-width="5"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div id="deko" aria-hidden="true"></div>
+
+  <main>
+    <h1>Zeit seit dem 25.07.2026</h1>
+    <div class="timer">
+      <!-- Jahre: erst sichtbar, wenn 1 Jahr erreicht ist -->
+      <div class="unit" id="unitY" hidden><span class="num" id="y">0</span><span class="label">Jahre</span></div>
+      <div class="unit"><span class="num" id="mo">0</span><span class="label">Monate</span></div>
+      <div class="unit"><span class="num" id="d">0</span><span class="label">Tage</span></div>
+      <div class="unit"><span class="num" id="h">00</span><span class="label">Stunden</span></div>
+      <div class="unit"><span class="num" id="mi">00</span><span class="label">Minuten</span></div>
+      <div class="unit"><span class="num" id="s">00</span><span class="label">Sekunden</span></div>
+    </div>
+    <p class="total" id="total"></p>
+  </main>
 
 <script>
+  // ---------- Timer ----------
   // Startzeitpunkt: 25.07.2026, 00:00 Uhr (lokale Zeit)
   const START = new Date(2026, 6, 25, 0, 0, 0);
   const $ = id => document.getElementById(id);
@@ -105,6 +180,12 @@
   }
 
   function setAll(y, mo, d, h, mi, s) {
+    // Zahl und Wort „Jahre" erscheinen erst ab 1 Jahr
+    const hideY = y < 1;
+    if ($("unitY").hidden !== hideY) {
+      $("unitY").hidden = hideY;
+      if (window.buildDeko) window.buildDeko();   // Layout hat sich geändert
+    }
     $("y").textContent = y;
     $("mo").textContent = mo;
     $("d").textContent = d;
@@ -115,6 +196,94 @@
 
   tick();
   setInterval(tick, 1000);
+
+  // ---------- Deko: Herzen, Blumen, Eheringe ----------
+  window.buildDeko = function () {
+    const deko = $("deko");
+    deko.innerHTML = "";
+    const hearts  = ["❤️", "💕", "💖", "💗", "💓"];
+    const flowers = ["🌸", "🌹", "🌷", "🌼", "💐", "🌺"];
+
+    const items = [];
+    const small = window.innerWidth < 600;
+    for (let i = 0; i < (small ? 6 : 8); i++) items.push({ ring: false, c: hearts[i % hearts.length] });
+    for (let i = 0; i < (small ? 5 : 7); i++) items.push({ ring: false, c: flowers[i % flowers.length] });
+    for (let i = 0; i < (small ? 4 : 5); i++) items.push({ ring: true });
+
+    // mischen
+    for (let i = items.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [items[i], items[j]] = [items[j], items[i]];
+    }
+
+    const N = items.length;
+    const rnd = (a, b) => a + Math.random() * (b - a);
+
+    // Freie Bereiche über und unter dem Timer suchen, damit nichts den Text verdeckt
+    const H = window.innerHeight;
+    const box = document.querySelector("main").getBoundingClientRect();
+    const zones = [];
+    const topEnd   = (box.top - 70) / H * 100;
+    const botStart = (box.bottom + 20) / H * 100;
+    const botEnd   = (H - 70) / H * 100;
+    if (topEnd - 2 >= 6)         zones.push({ a: 2,        len: topEnd - 2 });
+    if (botEnd - botStart >= 6)  zones.push({ a: botStart, len: botEnd - botStart });
+    let total = zones.reduce((s, z) => s + z.len, 0);
+    deko.classList.remove("faint");
+    if (total < 12) {             // zu wenig Platz (z. B. Handy quer): überall, aber blass
+      zones.length = 0;
+      zones.push({ a: 2, len: 86 });
+      total = 86;
+      deko.classList.add("faint");
+    }
+    const pickY = s => {
+      let t = s * total;
+      for (const z of zones) { if (t < z.len) return z.a + t; t -= z.len; }
+      const last = zones[zones.length - 1];
+      return last.a + last.len;
+    };
+
+    items.forEach((it, i) => {
+      const dx = rnd(8, 18);          // wie weit es nach links/rechts schwingt (vw)
+      const t1 = rnd(6, 12);          // Dauer vor und zurück (s)
+      const t2 = rnd(3, 6);           // Dauer Auf und Ab (s)
+      const fx = (i + Math.random() * 0.8) / N;
+      const y  = pickY((((i * 7) % N) + Math.random() * 0.8) / N);
+
+      const el = document.createElement("span");
+      el.className = "item" + (it.ring ? " ring" : "");
+      el.style.setProperty("--x", (dx + fx * (100 - 2 * dx - 10)) + "%");
+      el.style.setProperty("--y", y + "%");
+      el.style.setProperty("--dx", dx + "vw");
+      el.style.setProperty("--t1", t1 + "s");
+      el.style.setProperty("--t2", t2 + "s");
+      el.style.setProperty("--d1", (-rnd(0, t1 * 2)) + "s");
+      el.style.setProperty("--d2", (-rnd(0, t2 * 2)) + "s");
+
+      const inner = document.createElement("span");
+      inner.className = "inner";
+      if (it.ring) {
+        inner.innerHTML = '<svg viewBox="0 0 64 40"><use href="#rings"/></svg>';
+      } else {
+        inner.textContent = it.c;
+      }
+      el.appendChild(inner);
+      deko.appendChild(el);
+    });
+  };
+
+  buildDeko();
+  let lw = window.innerWidth, lh = window.innerHeight, rt;
+  window.addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      // Nur neu aufbauen, wenn sich die Fenstergröße wirklich ändert (nicht bei der Adressleiste am Handy)
+      if (window.innerWidth !== lw || Math.abs(window.innerHeight - lh) / lh > 0.15) {
+        lw = window.innerWidth; lh = window.innerHeight;
+        buildDeko();
+      }
+    }, 250);
+  });
 </script>
 </body>
 </html>
