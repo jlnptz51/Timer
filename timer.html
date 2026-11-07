@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer seit dem 25.07.2026</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    padding: 1.5rem;
+    text-align: center;
+  }
+  h1 {
+    font-size: clamp(1rem, 3vw, 1.6rem);
+    font-weight: 300;
+    letter-spacing: .25em;
+    text-transform: uppercase;
+    color: #aaa;
+  }
+  .timer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(1rem, 3vw, 2.5rem);
+  }
+  .unit { min-width: 5.5rem; }
+  .num {
+    display: block;
+    font-size: clamp(3rem, 11vw, 7rem);
+    font-weight: 900;
+    line-height: 1;
+    color: #ff1a1a;
+    -webkit-text-stroke: 3px #1e5bff;
+    paint-order: stroke fill;
+    text-shadow: 0 0 18px rgba(30, 91, 255, .45);
+    font-variant-numeric: tabular-nums;
+  }
+  .label {
+    display: block;
+    margin-top: .6rem;
+    font-size: clamp(.7rem, 2vw, 1rem);
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: #888;
+  }
+  .total { font-size: clamp(.85rem, 2.2vw, 1.1rem); color: #666; }
+</style>
+</head>
+<body>
+  <h1>Zeit seit dem 25.07.2026</h1>
+  <div class="timer">
+    <div class="unit"><span class="num" id="y">0</span><span class="label">Jahre</span></div>
+    <div class="unit"><span class="num" id="mo">0</span><span class="label">Monate</span></div>
+    <div class="unit"><span class="num" id="d">0</span><span class="label">Tage</span></div>
+    <div class="unit"><span class="num" id="h">00</span><span class="label">Stunden</span></div>
+    <div class="unit"><span class="num" id="mi">00</span><span class="label">Minuten</span></div>
+    <div class="unit"><span class="num" id="s">00</span><span class="label">Sekunden</span></div>
+  </div>
+  <p class="total" id="total"></p>
+
+<script>
+  // Startzeitpunkt: 25.07.2026, 00:00 Uhr (lokale Zeit)
+  const START = new Date(2026, 6, 25, 0, 0, 0);
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, "0");
+
+  function tick() {
+    const now = new Date();
+    if (now < START) {
+      // Falls das Datum noch in der Zukunft liegt: Countdown-Anzeige
+      const diff = START - now;
+      setAll(0, 0, Math.floor(diff / 864e5), Math.floor(diff / 36e5) % 24,
+             Math.floor(diff / 6e4) % 60, Math.floor(diff / 1e3) % 60);
+      $("total").textContent = "Noch nicht gestartet – es läuft rückwärts bis zum 25.07.2026";
+      return;
+    }
+    let y = now.getFullYear() - START.getFullYear();
+    let mo = now.getMonth() - START.getMonth();
+    let d = now.getDate() - START.getDate();
+    let h = now.getHours() - START.getHours();
+    let mi = now.getMinutes() - START.getMinutes();
+    let s = now.getSeconds() - START.getSeconds();
+
+    if (s < 0) { s += 60; mi--; }
+    if (mi < 0) { mi += 60; h--; }
+    if (h < 0) { h += 24; d--; }
+    if (d < 0) {
+      d += new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+      mo--;
+    }
+    if (mo < 0) { mo += 12; y--; }
+
+    setAll(y, mo, d, h, mi, s);
+    const totalDays = Math.floor((now - START) / 864e5);
+    $("total").textContent = "Insgesamt " + totalDays.toLocaleString("de-DE") + " Tage";
+  }
+
+  function setAll(y, mo, d, h, mi, s) {
+    $("y").textContent = y;
+    $("mo").textContent = mo;
+    $("d").textContent = d;
+    $("h").textContent = pad(h);
+    $("mi").textContent = pad(mi);
+    $("s").textContent = pad(s);
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
