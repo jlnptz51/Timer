@@ -43,17 +43,31 @@
   }
   .unit { min-width: 5.5rem; }
   .unit[hidden] { display: none; }
+  /* Fortschrittsringe um die Zahlen */
+  .ring { --d: clamp(84px, 24vw, 120px); position: relative; width: var(--d); aspect-ratio: 1; margin: 0 auto; }
+  .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .ring .spur { fill: none; stroke: rgba(255, 255, 255, .14); stroke-width: 5; }
+  .ring .fort {
+    fill: none; stroke: #2f6bff; stroke-width: 5; stroke-linecap: round;
+    stroke-dasharray: 213.63; stroke-dashoffset: 213.63;
+    transition: stroke-dashoffset .6s ease;
+    filter: drop-shadow(0 0 4px rgba(47, 107, 255, .9));
+  }
   .num {
-    display: block;
-    font-size: clamp(3rem, 11vw, 7rem);
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: calc(var(--d) * .36);
     font-weight: 900;
     line-height: 1;
     color: #ff1a1a;
-    -webkit-text-stroke: 3px #1e5bff;
-    paint-order: stroke fill;
-    text-shadow: 0 0 18px rgba(30, 91, 255, .45);
+    text-shadow: 0 0 3px #000, 0 0 12px rgba(255, 26, 26, .45);
     font-variant-numeric: tabular-nums;
   }
+  @media (min-width: 760px) {
+    .ring { --d: clamp(92px, 11vw, 128px); }
+    .timer { flex-wrap: nowrap; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ring .fort { transition: none; } }
   .label {
     display: block;
     margin-top: .6rem;
@@ -212,12 +226,12 @@
 
     <div class="timer">
       <!-- Jahre: erst sichtbar, wenn 1 Jahr erreicht ist -->
-      <div class="unit" id="unitY" hidden><span class="num" id="y">0</span><span class="label">Jahre</span></div>
-      <div class="unit"><span class="num" id="mo">0</span><span class="label">Monate</span></div>
-      <div class="unit"><span class="num" id="d">0</span><span class="label">Tage</span></div>
-      <div class="unit"><span class="num" id="h">00</span><span class="label">Stunden</span></div>
-      <div class="unit"><span class="num" id="mi">00</span><span class="label">Minuten</span></div>
-      <div class="unit"><span class="num" id="s">00</span><span class="label">Sekunden</span></div>
+      <div class="unit" id="unitY" hidden><div class="ring" data-ring="y"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="y">0</span></div><span class="label">Jahre</span></div>
+      <div class="unit"><div class="ring" data-ring="mo"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="mo">0</span></div><span class="label">Monate</span></div>
+      <div class="unit"><div class="ring" data-ring="d"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="d">0</span></div><span class="label">Tage</span></div>
+      <div class="unit"><div class="ring" data-ring="h"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="h">00</span></div><span class="label">Stunden</span></div>
+      <div class="unit"><div class="ring" data-ring="mi"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="mi">00</span></div><span class="label">Minuten</span></div>
+      <div class="unit"><div class="ring" data-ring="s"><svg viewBox="0 0 80 80" aria-hidden="true"><circle class="spur" cx="40" cy="40" r="34"/><circle class="fort" cx="40" cy="40" r="34"/></svg><span class="num" id="s">00</span></div><span class="label">Sekunden</span></div>
     </div>
 
     <p class="spruch" id="spruch" hidden></p>
@@ -311,6 +325,25 @@
     $("h").textContent = pad(h);
     $("mi").textContent = pad(mi);
     $("s").textContent = pad(s);
+    setRings(y, mo, d, h, mi, s);
+  }
+
+  // Ringe: zeigen, wie weit die jeweilige Einheit schon ist
+  const ringVorher = {};
+  function setRings(y, mo, d, h, mi, s) {
+    const frac = {
+      s: s / 60, mi: (mi + s / 60) / 60, h: (h + mi / 60) / 24,
+      d: d / 30, mo: (mo + d / 30) / 12, y: (mo + d / 30) / 12
+    };
+    document.querySelectorAll("[data-ring]").forEach(r => {
+      const k = r.dataset.ring, c = r.querySelector(".fort");
+      const f = Math.min(1, frac[k]);
+      const umbruch = ringVorher[k] !== undefined && f < ringVorher[k];
+      if (umbruch) c.style.transition = "none";          // beim Neustart nicht rückwärts laufen
+      c.style.strokeDashoffset = 213.63 * (1 - f);
+      if (umbruch) { void c.getBoundingClientRect(); c.style.transition = ""; }
+      ringVorher[k] = f;
+    });
   }
 
   tick();
