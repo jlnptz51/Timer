@@ -25,7 +25,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2.5rem;
+    gap: clamp(1.4rem, 4vw, 2.5rem);
   }
   h1 {
     font-size: clamp(1rem, 3vw, 1.6rem);
@@ -33,6 +33,7 @@
     letter-spacing: .25em;
     text-transform: uppercase;
     color: #aaa;
+    text-shadow: 0 0 4px #000, 0 0 8px #000;
   }
   .timer {
     display: flex;
@@ -60,17 +61,57 @@
     letter-spacing: .2em;
     text-transform: uppercase;
     color: #888;
+    text-shadow: 0 0 4px #000, 0 0 8px #000;
   }
-  .total { font-size: clamp(.85rem, 2.2vw, 1.1rem); color: #666; }
+  .spruch {
+    font-size: clamp(1rem, 3.2vw, 1.5rem);
+    font-weight: 300;
+    letter-spacing: .03em;
+    color: #ffc2d6;
+    text-shadow: 0 0 3px #000, 0 0 8px #000, 0 0 14px rgba(255, 90, 160, .35);
+    text-wrap: balance;
+  }
+  .total { font-size: clamp(.85rem, 2.2vw, 1.1rem); color: #666; text-shadow: 0 0 4px #000, 0 0 8px #000; }
 
-  /* ---------- Schwebende Deko im Hintergrund ---------- */
-  #deko {
+  /* Überraschung am Jahrestag */
+  .jahrestag {
+    font-size: clamp(1.2rem, 4.8vw, 2.4rem);
+    font-weight: 800;
+    color: #ffe08a;
+    text-shadow: 0 0 16px rgba(255, 90, 160, .75);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    animation: pulse 1s ease-in-out infinite alternate;
+  }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.06); } }
+
+  /* ---------- Ebenen im Hintergrund ---------- */
+  #stars, #deko, #rain, #fx {
     position: fixed;
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    z-index: 0;
   }
+  #stars, #deko, #rain { z-index: 0; }
+  #fx { z-index: 5; }
+
+  /* Funkeln */
+  .star {
+    position: absolute;
+    line-height: 1;
+    opacity: .2;
+    animation: twinkle var(--tw) ease-in-out infinite alternate;
+    animation-delay: var(--td);
+  }
+  @keyframes twinkle {
+    from { opacity: .12; transform: scale(.7); }
+    to   { opacity: .95; transform: scale(1.15); }
+  }
+
+  /* Schwebende Herzen, Blumen und Eheringe */
   .item {
     position: absolute;
     left: var(--x);
@@ -79,6 +120,12 @@
     line-height: 1;
     opacity: .9;
     will-change: transform;
+    pointer-events: auto;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
     animation: sway var(--t1) ease-in-out infinite alternate;
     animation-delay: var(--d1);
   }
@@ -87,10 +134,13 @@
     animation: bob var(--t2) ease-in-out infinite alternate;
     animation-delay: var(--d2);
   }
+  .item .face { display: block; }
+  .item .face.pop  { animation: pop .35s ease-out forwards; }
+  .item .face.back { animation: back .6s ease-out; }
   .item.ring { width: clamp(3rem, 9vw, 5.5rem); }
-  #deko.faint .item { opacity: .3; }
   .item.ring .inner { filter: drop-shadow(0 0 6px rgba(255, 200, 80, .45)); }
   .item.ring svg { display: block; width: 100%; height: auto; }
+  #deko.faint .item { opacity: .3; }
 
   /* vor und zurück */
   @keyframes sway {
@@ -102,8 +152,16 @@
     from { transform: translateY(-1.8vh) rotate(-12deg); }
     to   { transform: translateY(1.8vh)  rotate(12deg); }
   }
+  /* Platzen beim Antippen */
+  @keyframes pop  { to { transform: scale(1.9); opacity: 0; } }
+  @keyframes back { from { transform: scale(.2); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Partikel (Konfetti, Herzregen, Funken) */
+  .fx { position: absolute; left: 0; top: 0; line-height: 1; pointer-events: none; will-change: transform; }
+
   @media (prefers-reduced-motion: reduce) {
-    .item, .item .inner { animation: none; }
+    .item, .item .inner, .star, .jahrestag { animation: none; }
+    .star { opacity: .5; }
   }
 </style>
 </head>
@@ -125,10 +183,17 @@
     </defs>
   </svg>
 
+  <div id="stars" aria-hidden="true"></div>
   <div id="deko" aria-hidden="true"></div>
+  <div id="rain" aria-hidden="true"></div>
+  <div id="fx" aria-hidden="true"></div>
 
   <main>
-    <h1>Zeit seit dem 25.07.2026</h1>
+    <!-- erscheint nur am Jahrestag -->
+    <div class="jahrestag" id="jahrestag" role="button" hidden></div>
+
+    <h1 id="titel"></h1>
+
     <div class="timer">
       <!-- Jahre: erst sichtbar, wenn 1 Jahr erreicht ist -->
       <div class="unit" id="unitY" hidden><span class="num" id="y">0</span><span class="label">Jahre</span></div>
@@ -138,15 +203,51 @@
       <div class="unit"><span class="num" id="mi">00</span><span class="label">Minuten</span></div>
       <div class="unit"><span class="num" id="s">00</span><span class="label">Sekunden</span></div>
     </div>
+
+    <p class="spruch" id="spruch" hidden></p>
     <p class="total" id="total"></p>
   </main>
 
 <script>
-  // ---------- Timer ----------
-  // Startzeitpunkt: 25.07.2026, 00:00 Uhr (lokale Zeit)
+  // =====================================================
+  //  EINSTELLUNGEN – hier kannst du Texte und Datum ändern
+  // =====================================================
+  // Titel ganz oben, z. B. "Julian & Name · 25.07.2026"
+  const TITEL = "Unser Ja-Wort · 25.07.2026";
+  // Startzeitpunkt: 25.07.2026, 00:00 Uhr (Monat zählt ab 0: Juli = 6)
   const START = new Date(2026, 6, 25, 0, 0, 0);
+
+  // ---------- Hilfsfunktionen ----------
   const $ = id => document.getElementById(id);
   const pad = n => String(n).padStart(2, "0");
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+  const reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+
+  $("titel").textContent = TITEL;
+
+  // ---------- Timer ----------
+  const EINHEITEN = [
+    ["Jahr", "Jahren"], ["Monat", "Monaten"], ["Tag", "Tagen"],
+    ["Stunde", "Stunden"], ["Minute", "Minuten"], ["Sekunde", "Sekunden"]
+  ];
+
+  // "Vor 3 Monaten und 13 Tagen haben wir Ja gesagt" (die zwei größten Einheiten)
+  function spruchText(werte) {
+    const teile = [];
+    werte.forEach((n, i) => {
+      if (n > 0 && teile.length < 2) teile.push(n + " " + EINHEITEN[i][n === 1 ? 0 : 1]);
+    });
+    return teile.length ? "Vor " + teile.join(" und ") + " haben wir Ja gesagt" : "";
+  }
+
+  let letzterSpruch = null;
+  function setSpruch(text) {
+    if (text === letzterSpruch) return;
+    letzterSpruch = text;
+    $("spruch").textContent = text;
+    $("spruch").hidden = !text;
+  }
 
   function tick() {
     const now = new Date();
@@ -155,6 +256,7 @@
       const diff = START - now;
       setAll(0, 0, Math.floor(diff / 864e5), Math.floor(diff / 36e5) % 24,
              Math.floor(diff / 6e4) % 60, Math.floor(diff / 1e3) % 60);
+      setSpruch("");
       $("total").textContent = "Noch nicht gestartet – es läuft rückwärts bis zum 25.07.2026";
       return;
     }
@@ -175,6 +277,7 @@
     if (mo < 0) { mo += 12; y--; }
 
     setAll(y, mo, d, h, mi, s);
+    setSpruch(spruchText([y, mo, d, h, mi, s]));
     const totalDays = Math.floor((now - START) / 864e5);
     $("total").textContent = "Insgesamt " + totalDays.toLocaleString("de-DE") + " Tage";
   }
@@ -197,7 +300,154 @@
   tick();
   setInterval(tick, 1000);
 
-  // ---------- Deko: Herzen, Blumen, Eheringe ----------
+  // ---------- Funkelnde Sterne ----------
+  function buildStars() {
+    const layer = $("stars");
+    layer.innerHTML = "";
+    const box = document.querySelector("main").getBoundingClientRect();
+    const W = window.innerWidth, Hh = window.innerHeight;
+    const farben = ["#ffffff", "#ffe9a3", "#ffc2d6", "#bcd0ff"];
+    const n = window.innerWidth < 600 ? 45 : 80;
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement("span");
+      el.className = "star";
+      const c = pick(farben);
+      // Sterne nicht hinter den Text setzen
+      let px, py, versuche = 0;
+      do {
+        px = rnd(0, 100); py = rnd(0, 100); versuche++;
+      } while (versuche < 12 &&
+               px / 100 * W > box.left - 12 && px / 100 * W < box.right + 12 &&
+               py / 100 * Hh > box.top - 12 && py / 100 * Hh < box.bottom + 12);
+      el.style.left = px + "%";
+      el.style.top = py + "%";
+      el.style.setProperty("--tw", rnd(1.5, 4.5) + "s");
+      el.style.setProperty("--td", (-rnd(0, 5)) + "s");
+      if (i % 7 === 0) {                       // größere Sterne
+        el.textContent = "✦";
+        el.style.fontSize = rnd(10, 18) + "px";
+        el.style.color = c;
+        el.style.textShadow = "0 0 8px " + c;
+      } else {                                  // kleine Lichtpunkte
+        const s = rnd(1.5, 3.5);
+        el.style.width = el.style.height = s + "px";
+        el.style.background = c;
+        el.style.boxShadow = "0 0 6px " + c;
+        el.style.borderRadius = "50%";
+      }
+      layer.appendChild(el);
+    }
+  }
+
+  // ---------- Effekte: Funken, Konfetti, Herzregen ----------
+  const fxLayer = $("fx"), rainLayer = $("rain");
+
+  // Kleiner Herzregen, wenn man ein Herz, eine Blume oder die Ringe antippt
+  const BURST = {
+    heart:  ["❤️", "💖", "💕", "✨"],
+    flower: ["🌸", "🌼", "💗", "✨"],
+    ring:   ["💍", "✨", "⭐", "✨"]
+  };
+  function burst(x, y, kind) {
+    if (reduce) return;
+    const set = BURST[kind] || BURST.heart;
+    for (let i = 0; i < 10; i++) {
+      const el = document.createElement("span");
+      el.className = "fx";
+      el.textContent = pick(set);
+      el.style.fontSize = rnd(14, 26) + "px";
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+      fxLayer.appendChild(el);
+      const ang = rnd(0, Math.PI * 2), dist = rnd(30, 90);
+      const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - 30;
+      el.animate([
+        { transform: "translate(-50%,-50%) translate(0,0) scale(.6)", opacity: 1 },
+        { transform: `translate(-50%,-50%) translate(${dx}px,${dy}px) scale(1)`, opacity: 1, offset: .4 },
+        { transform: `translate(-50%,-50%) translate(${dx * 1.3}px,${dy + rnd(90, 160)}px) scale(.8)`, opacity: 0 }
+      ], { duration: rnd(900, 1500), easing: "ease-out", fill: "forwards" }).onfinish = () => el.remove();
+    }
+  }
+
+  // Konfetti-Explosion
+  function confetti(cx, cy) {
+    if (reduce) return;
+    const x0 = cx === undefined ? window.innerWidth / 2 : cx;
+    const y0 = cy === undefined ? window.innerHeight * 0.3 : cy;
+    const farben = ["#ff1a1a", "#1e5bff", "#ffd34d", "#ff7ab8", "#ffffff"];
+    for (let i = 0; i < 90; i++) {
+      const el = document.createElement("span");
+      el.className = "fx";
+      const w = rnd(6, 11);
+      el.style.width = w + "px";
+      el.style.height = w * rnd(1, 1.8) + "px";
+      el.style.background = pick(farben);
+      if (Math.random() < .3) el.style.borderRadius = "50%";
+      el.style.left = x0 + "px";
+      el.style.top = y0 + "px";
+      fxLayer.appendChild(el);
+      const ang = rnd(-Math.PI, 0), v = rnd(80, 320);      // nach oben und außen
+      const dx = Math.cos(ang) * v, dy = Math.sin(ang) * v;
+      const rot = rnd(-720, 720);
+      el.animate([
+        { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
+        { transform: `translate(${dx}px,${dy}px) rotate(${rot / 2}deg)`, opacity: 1, offset: .35 },
+        { transform: `translate(${dx * 1.4}px,${dy + window.innerHeight * .8}px) rotate(${rot}deg)`, opacity: 0 }
+      ], { duration: rnd(1800, 3200), easing: "ease-out", fill: "forwards" }).onfinish = () => el.remove();
+    }
+  }
+
+  // Herzregen: fallende Herzen, Blumen und Eheringe
+  const REGEN = ["❤️", "💖", "💕", "🌸", "🌹", "🌷", "ring", "ring"];
+  function rain() {
+    if (document.hidden || reduce) return;
+    const art = pick(REGEN);
+    const el = document.createElement("span");
+    el.className = "fx";
+    el.style.opacity = ".8";
+    if (art === "ring") {
+      el.style.width = rnd(34, 56) + "px";
+      el.innerHTML = '<svg viewBox="0 0 64 40" style="display:block;width:100%;height:auto"><use href="#rings"/></svg>';
+    } else {
+      el.textContent = art;
+      el.style.fontSize = rnd(20, 36) + "px";
+    }
+    el.style.left = rnd(0, Math.max(10, window.innerWidth - 50)) + "px";
+    rainLayer.appendChild(el);
+    const drift = rnd(-60, 60);
+    el.animate([
+      { transform: `translate(0,-60px) rotate(${rnd(-20, 20)}deg)` },
+      { transform: `translate(${drift}px,${window.innerHeight + 80}px) rotate(${rnd(-90, 90)}deg)` }
+    ], { duration: rnd(5000, 9000), easing: "linear", fill: "forwards" }).onfinish = () => el.remove();
+  }
+
+  // ---------- Überraschung am Jahrestag (25.07. jedes Jahr) ----------
+  // Vorschau zum Ausprobieren: Adresse mit ?jahrestag am Ende öffnen (oder ?jahrestag=3)
+  function jahrestag() {
+    const p = new URLSearchParams(window.location.search);
+    if (p.has("jahrestag")) return parseInt(p.get("jahrestag"), 10) || 1;
+    const now = new Date();
+    const n = now.getFullYear() - START.getFullYear();
+    if (n >= 1 && now.getMonth() === START.getMonth() && now.getDate() === START.getDate()) return n;
+    return 0;
+  }
+
+  const JT = jahrestag();
+  if (JT) {
+    const b = $("jahrestag");
+    b.textContent = "💍 Heute ist unser " + JT + ". Jahrestag! 💍";
+    b.hidden = false;
+    b.addEventListener("pointerdown", () => {
+      const r = b.getBoundingClientRect();
+      confetti(r.left + r.width / 2, r.top + r.height / 2);
+    });
+    if (!reduce) {
+      setTimeout(() => confetti(), 500);
+      setInterval(rain, 450);
+    }
+  }
+
+  // ---------- Schwebende Deko: Herzen, Blumen, Eheringe ----------
   window.buildDeko = function () {
     const deko = $("deko");
     deko.innerHTML = "";
@@ -206,9 +456,9 @@
 
     const items = [];
     const small = window.innerWidth < 600;
-    for (let i = 0; i < (small ? 6 : 8); i++) items.push({ ring: false, c: hearts[i % hearts.length] });
-    for (let i = 0; i < (small ? 5 : 7); i++) items.push({ ring: false, c: flowers[i % flowers.length] });
-    for (let i = 0; i < (small ? 4 : 5); i++) items.push({ ring: true });
+    for (let i = 0; i < (small ? 6 : 8); i++) items.push({ kind: "heart",  c: hearts[i % hearts.length] });
+    for (let i = 0; i < (small ? 5 : 7); i++) items.push({ kind: "flower", c: flowers[i % flowers.length] });
+    for (let i = 0; i < (small ? 4 : 5); i++) items.push({ kind: "ring" });
 
     // mischen
     for (let i = items.length - 1; i > 0; i--) {
@@ -216,21 +466,20 @@
       [items[i], items[j]] = [items[j], items[i]];
     }
 
-    const N = items.length;
-    const rnd = (a, b) => a + Math.random() * (b - a);
+    let N = items.length;
 
     // Freie Bereiche über und unter dem Timer suchen, damit nichts den Text verdeckt
     const H = window.innerHeight;
     const box = document.querySelector("main").getBoundingClientRect();
     const zones = [];
     const topEnd   = (box.top - 70) / H * 100;
-    const botStart = (box.bottom + 20) / H * 100;
+    const botStart = (box.bottom + 40) / H * 100;
     const botEnd   = (H - 70) / H * 100;
-    if (topEnd - 2 >= 6)         zones.push({ a: 2,        len: topEnd - 2 });
-    if (botEnd - botStart >= 6)  zones.push({ a: botStart, len: botEnd - botStart });
+    if (topEnd - 2 >= 4)         zones.push({ a: 2,        len: topEnd - 2 });
+    if (botEnd - botStart >= 4)  zones.push({ a: botStart, len: botEnd - botStart });
     let total = zones.reduce((s, z) => s + z.len, 0);
     deko.classList.remove("faint");
-    if (total < 12) {             // zu wenig Platz (z. B. Handy quer): überall, aber blass
+    if (total < 8) {              // zu wenig Platz (z. B. Handy quer): überall, aber blass
       zones.length = 0;
       zones.push({ a: 2, len: 86 });
       total = 86;
@@ -243,15 +492,25 @@
       return last.a + last.len;
     };
 
+    // Wenig Platz? Dann weniger Elemente, damit es nicht gedrängt aussieht
+    N = Math.max(6, Math.min(items.length, Math.round(items.length * Math.min(1, total / 30))));
+    items.length = N;
+    const perm = items.map((_, i) => i);
+    for (let i = perm.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+
     items.forEach((it, i) => {
       const dx = rnd(8, 18);          // wie weit es nach links/rechts schwingt (vw)
       const t1 = rnd(6, 12);          // Dauer vor und zurück (s)
       const t2 = rnd(3, 6);           // Dauer Auf und Ab (s)
       const fx = (i + Math.random() * 0.8) / N;
-      const y  = pickY((((i * 7) % N) + Math.random() * 0.8) / N);
+      const y  = pickY((perm[i] + Math.random() * 0.8) / N);
 
       const el = document.createElement("span");
-      el.className = "item" + (it.ring ? " ring" : "");
+      el.className = "item" + (it.kind === "ring" ? " ring" : "");
+      el.dataset.kind = it.kind;
       el.style.setProperty("--x", (dx + fx * (100 - 2 * dx - 10)) + "%");
       el.style.setProperty("--y", y + "%");
       el.style.setProperty("--dx", dx + "vw");
@@ -262,17 +521,37 @@
 
       const inner = document.createElement("span");
       inner.className = "inner";
-      if (it.ring) {
-        inner.innerHTML = '<svg viewBox="0 0 64 40"><use href="#rings"/></svg>';
+      const face = document.createElement("span");
+      face.className = "face";
+      if (it.kind === "ring") {
+        face.innerHTML = '<svg viewBox="0 0 64 40"><use href="#rings"/></svg>';
       } else {
-        inner.textContent = it.c;
+        face.textContent = it.c;
       }
+      inner.appendChild(face);
       el.appendChild(inner);
       deko.appendChild(el);
     });
   };
 
+  // Antippen: platzt mit kleinem Herzregen und kommt nach kurzer Zeit wieder
+  $("deko").addEventListener("pointerdown", e => {
+    const item = e.target.closest(".item");
+    if (!item) return;
+    const face = item.querySelector(".face");
+    if (face.classList.contains("pop")) return;
+    const r = face.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, item.dataset.kind);
+    face.classList.add("pop");
+    setTimeout(() => {
+      face.classList.remove("pop");
+      face.classList.add("back");
+      setTimeout(() => face.classList.remove("back"), 700);
+    }, 1800);
+  });
+
   buildDeko();
+  buildStars();
   let lw = window.innerWidth, lh = window.innerHeight, rt;
   window.addEventListener("resize", () => {
     clearTimeout(rt);
@@ -281,6 +560,7 @@
       if (window.innerWidth !== lw || Math.abs(window.innerHeight - lh) / lh > 0.15) {
         lw = window.innerWidth; lh = window.innerHeight;
         buildDeko();
+        buildStars();
       }
     }, 250);
   });
